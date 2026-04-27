@@ -8,6 +8,7 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GradientPaint;
 import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 
 /**
  * JPanel chuyên render game và nhận input chuột.
@@ -27,12 +29,21 @@ public class GamePanel extends JPanel {
     private long fpsTimerMs;
     private int frameCounter;
     private int currentFps;
+    private long lastMouseActionMs;
+    private int lastMouseX;
+    private int lastMouseY;
+    private Rectangle basicBtn;
+    private Rectangle sniperBtn;
+    private Rectangle rapidBtn;
 
     public GamePanel(GameManager gameManager) {
         this.gameManager = gameManager;
         this.fpsTimerMs = System.currentTimeMillis();
         this.frameCounter = 0;
         this.currentFps = 0;
+        this.lastMouseActionMs = 0;
+        this.lastMouseX = -1;
+        this.lastMouseY = -1;
 
         setPreferredSize(new Dimension(GameManager.WIDTH, GameManager.HEIGHT));
         setBackground(new Color(205, 230, 200));
@@ -40,13 +51,19 @@ public class GamePanel extends JPanel {
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON1) {
-                    gameManager.handleLeftClick(e.getX(), e.getY());
-                } else if (e.getButton() == MouseEvent.BUTTON3) {
-                    gameManager.handleRightClick(e.getX(), e.getY());
-                } else if (e.getButton() == MouseEvent.BUTTON2) {
-                    gameManager.handleMiddleClick(e.getX(), e.getY());
-                }
+                handleMouseAction(e);
+                repaint();
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                handleMouseAction(e);
+                repaint();
+            }
+
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                handleMouseAction(e);
                 repaint();
             }
         };
@@ -67,6 +84,44 @@ public class GamePanel extends JPanel {
         });
     }
 
+    private void handleMouseAction(MouseEvent e) {
+        long now = System.currentTimeMillis();
+        int dx = Math.abs(e.getX() - lastMouseX);
+        int dy = Math.abs(e.getY() - lastMouseY);
+        if (now - lastMouseActionMs < 90 && dx < 3 && dy < 3) {
+            return;
+        }
+        lastMouseActionMs = now;
+        lastMouseX = e.getX();
+        lastMouseY = e.getY();
+
+        if (SwingUtilities.isLeftMouseButton(e)) {
+            if (!handleBuildBarClick(e.getX(), e.getY())) {
+                gameManager.handleLeftClick(e.getX(), e.getY());
+            }
+        } else if (SwingUtilities.isRightMouseButton(e)) {
+            gameManager.handleRightClick(e.getX(), e.getY());
+        } else if (SwingUtilities.isMiddleMouseButton(e)) {
+            gameManager.handleMiddleClick(e.getX(), e.getY());
+        }
+    }
+
+    private boolean handleBuildBarClick(int x, int y) {
+        if (basicBtn != null && basicBtn.contains(x, y)) {
+            gameManager.setSelectedBuildType(TowerType.BASIC);
+            return true;
+        }
+        if (sniperBtn != null && sniperBtn.contains(x, y)) {
+            gameManager.setSelectedBuildType(TowerType.SNIPER);
+            return true;
+        }
+        if (rapidBtn != null && rapidBtn.contains(x, y)) {
+            gameManager.setSelectedBuildType(TowerType.RAPID);
+            return true;
+        }
+        return false;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -80,6 +135,7 @@ public class GamePanel extends JPanel {
         drawEntities(g2d);
         drawPlacementPreview(g2d);
         drawSelectedTowerCard(g2d);
+        drawBuildBar(g2d);
         drawBottomHint(g2d);
         drawPauseOverlay(g2d);
         drawGameOver(g2d);
@@ -96,8 +152,8 @@ public class GamePanel extends JPanel {
         g2d.drawString("HP: " + gameManager.getPlayerHp(), 18, 28);
         g2d.drawString("Gold: " + gameManager.getGold(), 130, 28);
         g2d.drawString("Wave: " + gameManager.getCurrentWave(), 270, 28);
-        g2d.drawString("Tower: " + gameManager.getTowerCost() + "g", 390, 28);
         g2d.drawString("FPS: " + currentFps, 495, 28);
+        g2d.drawString("Map: " + gameManager.getMap().getName(), 570, 52);
 
         String waveStatus = gameManager.isWaveRunning()
                 ? "Enemies Left: " + gameManager.getEnemiesRemainingInWave()
@@ -183,12 +239,25 @@ public class GamePanel extends JPanel {
         if (mouseY < GameManager.TOP_UI_HEIGHT || gameManager.getPlayerHp() <= 0) {
             return;
         }
-        boolean canPlace = gameManager.canPlaceTowerAt(mouseX, mouseY) && gameManager.getGold() >= gameManager.getTowerCost();
+        TowerType type = gameManager.getSelectedBuildType();
+        if (type == null) {
+            return;
+        }
+        int cost = type.getCost();
+        boolean canPlace = gameManager.canPlaceTowerAt(mouseX, mouseY) && gameManager.getGold() >= cost;
         Color tint = canPlace ? new Color(63, 201, 94, 90) : new Color(224, 82, 82, 90);
 
         int previewSize = 30;
         g2d.setColor(tint);
         g2d.fillOval(mouseX - previewSize / 2, mouseY - previewSize / 2, previewSize, previewSize);
+
+        // Hiển thị range khi đặt (preview).
+        Tower previewTower = type.create(mouseX, mouseY);
+        int r = (int) previewTower.getRange();
+        g2d.setColor(new Color(0, 0, 0, 45));
+        g2d.fillOval(mouseX - r, mouseY - r, r * 2, r * 2);
+        g2d.setColor(new Color(0, 0, 0, 80));
+        g2d.drawOval(mouseX - r, mouseY - r, r * 2, r * 2);
     }
 
     private void drawSelectedTowerCard(Graphics2D g2d) {
@@ -198,7 +267,7 @@ public class GamePanel extends JPanel {
         }
 
         int cardW = 200;
-        int cardH = 142;
+        int cardH = 162;
         int cardX = getWidth() - cardW - 15;
         int cardY = GameManager.TOP_UI_HEIGHT + 12;
 
@@ -211,15 +280,18 @@ public class GamePanel extends JPanel {
         g2d.setFont(new Font("SansSerif", Font.BOLD, 15));
         g2d.drawString("Selected Tower", cardX + 14, cardY + 24);
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 14));
-        g2d.drawString("Level: " + selected.getLevel(), cardX + 14, cardY + 45);
-        g2d.drawString("Damage: " + selected.getDamage(), cardX + 14, cardY + 64);
-        g2d.drawString("Range: " + (int) selected.getRange(), cardX + 14, cardY + 83);
-        g2d.drawString(String.format(Locale.US, "Fire Rate: %.2f/s", selected.getFireRatePerSecond()), cardX + 14, cardY + 102);
-        g2d.drawString("Target: " + selected.getTargetingMode().getLabel(), cardX + 14, cardY + 121);
+        g2d.drawString("Type: " + selected.getName(), cardX + 14, cardY + 45);
+        g2d.drawString("Level: " + selected.getLevel(), cardX + 14, cardY + 64);
+        g2d.drawString("Damage: " + selected.getDamage(), cardX + 14, cardY + 83);
+        g2d.drawString("Range: " + (int) selected.getRange(), cardX + 14, cardY + 102);
+        g2d.drawString(String.format(Locale.US, "Fire Rate: %.2f/s", selected.getFireRatePerSecond()), cardX + 14, cardY + 121);
+        g2d.drawString("Target: " + selected.getTargetingMode().getLabel(), cardX + 14, cardY + 140);
     }
 
     private void drawMapBackground(Graphics2D g2d) {
-        g2d.setPaint(new GradientPaint(0, 0, new Color(201, 236, 193), 0, getHeight(), new Color(164, 214, 164)));
+        Color top = gameManager.getMap().getBgTop();
+        Color bottom = gameManager.getMap().getBgBottom();
+        g2d.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
         g2d.fillRect(0, GameManager.TOP_UI_HEIGHT, getWidth(), getHeight() - GameManager.TOP_UI_HEIGHT);
 
         // Vẽ lưới nhẹ để map có chiều sâu.
@@ -236,7 +308,69 @@ public class GamePanel extends JPanel {
         g2d.setColor(new Color(20, 20, 20, 180));
         g2d.fillRoundRect(10, getHeight() - 34, 690, 24, 8, 8);
         g2d.setColor(new Color(255, 255, 255));
-        g2d.drawString("Left: place/select | Right: upgrade | Middle click tower: change target mode", 18, getHeight() - 16);
+        g2d.drawString("Click build bar to pick tower | Left: place/select | Right: upgrade | Middle: targeting", 18,
+                getHeight() - 16);
+    }
+
+    private void drawBuildBar(Graphics2D g2d) {
+        int barH = 64;
+        int y = getHeight() - barH - 42;
+        int x = 12;
+        int w = 420;
+
+        g2d.setColor(new Color(20, 25, 33, 200));
+        g2d.fillRoundRect(x, y, w, barH, 14, 14);
+        g2d.setColor(new Color(255, 255, 255, 50));
+        g2d.drawRoundRect(x, y, w, barH, 14, 14);
+
+        int btnW = 130;
+        int btnH = 44;
+        int by = y + 10;
+        basicBtn = new Rectangle(x + 10, by, btnW, btnH);
+        sniperBtn = new Rectangle(x + 10 + btnW + 10, by, btnW, btnH);
+        rapidBtn = new Rectangle(x + 10 + (btnW + 10) * 2, by, btnW, btnH);
+
+        drawTowerButton(g2d, basicBtn, TowerType.BASIC);
+        drawTowerButton(g2d, sniperBtn, TowerType.SNIPER);
+        drawTowerButton(g2d, rapidBtn, TowerType.RAPID);
+
+        TowerType selected = gameManager.getSelectedBuildType();
+        if (selected != null) {
+            g2d.setColor(new Color(255, 255, 255, 170));
+            g2d.setFont(new Font("SansSerif", Font.PLAIN, 14));
+            g2d.drawString("Selected: " + selected.getLabel(), x + 14, y - 8);
+        }
+    }
+
+    private void drawTowerButton(Graphics2D g2d, Rectangle rect, TowerType type) {
+        boolean hover = rect.contains(mouseX, mouseY);
+        boolean selected = type == gameManager.getSelectedBuildType();
+        boolean affordable = gameManager.getGold() >= type.getCost();
+
+        Color base = new Color(46, 54, 72);
+        if (selected) {
+            base = new Color(52, 165, 96);
+        }
+        if (!affordable) {
+            base = new Color(110, 113, 120);
+        }
+        Color fill = hover ? base.brighter() : base;
+
+        g2d.setColor(new Color(0, 0, 0, 110));
+        g2d.fillRoundRect(rect.x + 2, rect.y + 3, rect.width, rect.height, 12, 12);
+
+        g2d.setColor(fill);
+        g2d.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 12, 12);
+
+        g2d.setColor(new Color(255, 255, 255, hover ? 210 : 130));
+        g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 12, 12);
+
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 14));
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(type.getLabel(), rect.x + 12, rect.y + 20);
+        g2d.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g2d.setColor(new Color(255, 255, 255, 200));
+        g2d.drawString(type.getCost() + "g", rect.x + 12, rect.y + 38);
     }
 
     private void drawPauseOverlay(Graphics2D g2d) {

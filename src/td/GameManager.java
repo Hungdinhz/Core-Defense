@@ -17,7 +17,6 @@ public class GameManager {
     public static final int HEIGHT = 600;
     public static final int TOP_UI_HEIGHT = 70;
 
-    private static final int TOWER_COST = 80;
     private static final int PLAYER_START_HP = 20;
     private static final int PLAYER_START_GOLD = 180;
 
@@ -25,6 +24,7 @@ public class GameManager {
     private final List<Tower> towers;
     private final List<Bullet> bullets;
     private final List<Effect> effects;
+    private final GameMap map;
     private final List<Point> pathPoints;
     private final Rectangle startWaveButtonRect;
     private final Rectangle pauseButtonRect;
@@ -48,13 +48,19 @@ public class GameManager {
     private boolean paused;
     private boolean gameOverSoundPlayed;
     private int bossesToSpawn;
+    private TowerType selectedBuildType;
 
     public GameManager() {
+        this(GameMaps.getDefault());
+    }
+
+    public GameManager(GameMap map) {
         this.enemies = new ArrayList<>();
         this.towers = new ArrayList<>();
         this.bullets = new ArrayList<>();
         this.effects = new ArrayList<>();
-        this.pathPoints = createPath();
+        this.map = map != null ? map : GameMaps.getDefault();
+        this.pathPoints = this.map.getWaypoints();
         this.startWaveButtonRect = new Rectangle(740, 18, 130, 34);
         this.pauseButtonRect = new Rectangle(570, 18, 72, 34);
         this.restartButtonRect = new Rectangle(652, 18, 78, 34);
@@ -75,6 +81,7 @@ public class GameManager {
         this.paused = false;
         this.gameOverSoundPlayed = false;
         this.bossesToSpawn = 0;
+        this.selectedBuildType = TowerType.BASIC;
     }
 
     public void setGamePanel(GamePanel gamePanel) {
@@ -206,19 +213,6 @@ public class GameManager {
         }
     }
 
-    private List<Point> createPath() {
-        List<Point> path = new ArrayList<>();
-        path.add(new Point(40, 180));
-        path.add(new Point(200, 180));
-        path.add(new Point(200, 420));
-        path.add(new Point(420, 420));
-        path.add(new Point(420, 150));
-        path.add(new Point(690, 150));
-        path.add(new Point(690, 360));
-        path.add(new Point(860, 360));
-        return path;
-    }
-
     public void startWave() {
         if (waveRunning || playerHp <= 0 || paused) {
             return;
@@ -238,11 +232,15 @@ public class GameManager {
         if (playerHp <= 0) {
             return;
         }
-        if (!canPlaceTowerAt(mouseX, mouseY) || gold < TOWER_COST) {
+        if (selectedBuildType == null) {
             return;
         }
-        towers.add(new Tower(mouseX, mouseY));
-        gold -= TOWER_COST;
+        int cost = selectedBuildType.getCost();
+        if (!canPlaceTowerAt(mouseX, mouseY) || gold < cost) {
+            return;
+        }
+        towers.add(selectedBuildType.create(mouseX, mouseY));
+        gold -= cost;
     }
 
     public void handleLeftClick(int mouseX, int mouseY) {
@@ -306,6 +304,7 @@ public class GameManager {
         bossesToSpawn = 0;
         paused = false;
         gameOverSoundPlayed = false;
+        selectedBuildType = TowerType.BASIC;
         saveManager.save(gold, currentWave);
     }
 
@@ -322,7 +321,7 @@ public class GameManager {
         for (Tower tower : towers) {
             double dx = tower.getX() - mx;
             double dy = tower.getY() - my;
-            if (Math.sqrt(dx * dx + dy * dy) < 42) {
+            if (Math.sqrt(dx * dx + dy * dy) < 34) {
                 return true;
             }
         }
@@ -333,7 +332,8 @@ public class GameManager {
         for (int i = 0; i < pathPoints.size() - 1; i++) {
             Point a = pathPoints.get(i);
             Point b = pathPoints.get(i + 1);
-            if (distancePointToSegment(mx, my, a.x, a.y, b.x, b.y) <= 24) {
+            // Nới vùng cấm đặt một chút để người chơi dễ đặt tower hơn.
+            if (distancePointToSegment(mx, my, a.x, a.y, b.x, b.y) <= 18) {
                 return true;
             }
         }
@@ -401,8 +401,8 @@ public class GameManager {
         return selectedTower;
     }
 
-    public int getTowerCost() {
-        return TOWER_COST;
+    public GameMap getMap() {
+        return map;
     }
 
     public int getEnemiesToSpawn() {
@@ -422,6 +422,14 @@ public class GameManager {
             return false;
         }
         return !isOnPath(x, y) && !isTooCloseToOtherTower(x, y);
+    }
+
+    public TowerType getSelectedBuildType() {
+        return selectedBuildType;
+    }
+
+    public void setSelectedBuildType(TowerType selectedBuildType) {
+        this.selectedBuildType = selectedBuildType;
     }
 
     public Rectangle getPauseButtonRect() {

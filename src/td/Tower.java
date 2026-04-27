@@ -5,28 +5,38 @@ import java.awt.Graphics2D;
 import java.util.List;
 
 /**
- * Tower đứng yên, tự tìm enemy gần nhất trong tầm.
+ * Tower (abstract): đứng yên, tự tìm mục tiêu trong tầm và bắn.
+ *
+ * Các tower cụ thể:
+ * - BasicTower
+ * - SniperTower
+ * - RapidTower
  */
-public class Tower {
-    private int x;
-    private int y;
-    private int level;
-    private double range;
-    private int damage;
-    private double fireRatePerSecond;
-    private long lastShotTimeMs;
-    private TargetingMode targetingMode;
+public abstract class Tower {
+    protected int x;
+    protected int y;
 
-    public Tower(int x, int y) {
+    protected int level;
+    protected double range;
+    protected int damage;
+    protected double fireRatePerSecond;
+    protected long lastShotTimeMs;
+    protected TargetingMode targetingMode;
+
+    protected Color outerColor;
+    protected Color innerColor;
+
+    protected Tower(int x, int y) {
         this.x = x;
         this.y = y;
         this.level = 1;
-        this.range = 110;
-        this.damage = 15;
-        this.fireRatePerSecond = 1.2;
         this.lastShotTimeMs = 0;
         this.targetingMode = TargetingMode.NEAREST;
     }
+
+    public abstract String getName();
+
+    public abstract int getCost();
 
     public Bullet tryShoot(List<Enemy> enemies, long nowMs) {
         long cooldownMs = (long) (1000.0 / fireRatePerSecond);
@@ -43,7 +53,7 @@ public class Tower {
         return new Bullet(x, y, target, damage, 5.5 + level * 0.4);
     }
 
-    private Enemy findTarget(List<Enemy> enemies) {
+    protected Enemy findTarget(List<Enemy> enemies) {
         Enemy best = null;
         double bestValue = Double.MAX_VALUE;
         for (Enemy enemy : enemies) {
@@ -63,7 +73,7 @@ public class Tower {
         return best;
     }
 
-    private double computePriorityValue(Enemy enemy, double distance) {
+    protected double computePriorityValue(Enemy enemy, double distance) {
         switch (targetingMode) {
             case LOWEST_HP:
                 return enemy.getHp() + distance * 0.02;
@@ -111,10 +121,10 @@ public class Tower {
         int drawY = y - size / 2;
 
         // Thân tower dạng tròn để nhìn mềm mại hơn.
-        g2d.setColor(new Color(49, 143, 67));
+        g2d.setColor(outerColor != null ? outerColor : new Color(49, 143, 67));
         g2d.fillOval(drawX, drawY, size, size);
 
-        g2d.setColor(new Color(35, 103, 48));
+        g2d.setColor(innerColor != null ? innerColor : new Color(35, 103, 48));
         g2d.fillOval(drawX + 5, drawY + 5, size - 10, size - 10);
 
         g2d.setColor(Color.BLACK);
