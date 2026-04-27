@@ -21,6 +21,8 @@ public class Enemy {
     protected boolean alive;
     protected boolean escaped;
     protected Color color;
+    protected double visualHp;
+    protected double pathProgress;
 
     public Enemy(List<Point> path, int hp, double speed, int rewardGold, int damageToPlayer, int size, Color color) {
         Point start = path.get(0);
@@ -36,6 +38,8 @@ public class Enemy {
         this.alive = true;
         this.escaped = false;
         this.color = color;
+        this.visualHp = hp;
+        this.pathProgress = 0;
     }
 
     /**
@@ -43,9 +47,11 @@ public class Enemy {
      */
     public boolean update(List<Point> path) {
         if (!alive) {
+            updateVisualHp();
             return false;
         }
         if (pathIndex >= path.size()) {
+            updateVisualHp();
             return true;
         }
 
@@ -62,6 +68,8 @@ public class Enemy {
             x += (dx / distance) * speed;
             y += (dy / distance) * speed;
         }
+        updateProgress(path);
+        updateVisualHp();
         return pathIndex >= path.size();
     }
 
@@ -83,9 +91,23 @@ public class Enemy {
         g2d.setColor(Color.DARK_GRAY);
         g2d.fillRect(barX, barY, barWidth, barHeight);
 
-        double hpPercent = Math.max(0, (double) hp / maxHp);
+        double hpPercent = Math.max(0, visualHp / maxHp);
         g2d.setColor(Color.GREEN);
         g2d.fillRect(barX, barY, (int) (barWidth * hpPercent), barHeight);
+    }
+
+    private void updateVisualHp() {
+        visualHp += (hp - visualHp) * 0.2;
+    }
+
+    private void updateProgress(List<Point> path) {
+        if (pathIndex >= path.size()) {
+            pathProgress = path.size() * 1000.0;
+            return;
+        }
+        Point target = path.get(pathIndex);
+        double distanceToNext = distanceTo(target.x, target.y);
+        pathProgress = pathIndex * 1000.0 - distanceToNext;
     }
 
     public void takeDamage(int damage) {
@@ -140,5 +162,13 @@ public class Enemy {
 
     public int getMaxHp() {
         return maxHp;
+    }
+
+    public double getPathProgress() {
+        return pathProgress;
+    }
+
+    public Color getColor() {
+        return color;
     }
 }

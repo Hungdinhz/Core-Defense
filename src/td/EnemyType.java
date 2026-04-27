@@ -6,5 +6,6 @@ package td;
 public enum EnemyType {
     NORMAL,
     FAST,
-    TANK
+    TANK,
+    BOSS
 }

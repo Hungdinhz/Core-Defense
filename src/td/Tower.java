@@ -15,6 +15,7 @@ public class Tower {
     private int damage;
     private double fireRatePerSecond;
     private long lastShotTimeMs;
+    private TargetingMode targetingMode;
 
     public Tower(int x, int y) {
         this.x = x;
@@ -24,6 +25,7 @@ public class Tower {
         this.damage = 15;
         this.fireRatePerSecond = 1.2;
         this.lastShotTimeMs = 0;
+        this.targetingMode = TargetingMode.NEAREST;
     }
 
     public Bullet tryShoot(List<Enemy> enemies, long nowMs) {
@@ -32,29 +34,46 @@ public class Tower {
             return null;
         }
 
-        Enemy target = findNearestEnemyInRange(enemies);
+        Enemy target = findTarget(enemies);
         if (target == null) {
             return null;
         }
 
         lastShotTimeMs = nowMs;
-        return new Bullet(x, y, target, damage, 5.5);
+        return new Bullet(x, y, target, damage, 5.5 + level * 0.4);
     }
 
-    private Enemy findNearestEnemyInRange(List<Enemy> enemies) {
-        Enemy nearest = null;
-        double nearestDist = Double.MAX_VALUE;
+    private Enemy findTarget(List<Enemy> enemies) {
+        Enemy best = null;
+        double bestValue = Double.MAX_VALUE;
         for (Enemy enemy : enemies) {
             if (!enemy.isAlive()) {
                 continue;
             }
             double dist = enemy.distanceTo(x, y);
-            if (dist <= range && dist < nearestDist) {
-                nearestDist = dist;
-                nearest = enemy;
+            if (dist > range) {
+                continue;
+            }
+            double value = computePriorityValue(enemy, dist);
+            if (best == null || value < bestValue) {
+                bestValue = value;
+                best = enemy;
             }
         }
-        return nearest;
+        return best;
+    }
+
+    private double computePriorityValue(Enemy enemy, double distance) {
+        switch (targetingMode) {
+            case LOWEST_HP:
+                return enemy.getHp() + distance * 0.02;
+            case FARTHEST_PROGRESS:
+                // Giá trị càng nhỏ càng ưu tiên, nên dùng âm progress.
+                return -enemy.getPathProgress();
+            case NEAREST:
+            default:
+                return distance;
+        }
     }
 
     public boolean canUpgrade() {
@@ -79,6 +98,11 @@ public class Tower {
         range += 20;
         damage += 10;
         fireRatePerSecond += 0.35;
+    }
+
+    public void cycleTargetingMode() {
+        TargetingMode[] values = TargetingMode.values();
+        targetingMode = values[(targetingMode.ordinal() + 1) % values.length];
     }
 
     public void draw(Graphics2D g2d, boolean selected) {
@@ -133,5 +157,9 @@ public class Tower {
 
     public double getFireRatePerSecond() {
         return fireRatePerSecond;
+    }
+
+    public TargetingMode getTargetingMode() {
+        return targetingMode;
     }
 }

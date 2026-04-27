@@ -24,10 +24,15 @@ public class GameManager {
     private final List<Enemy> enemies;
     private final List<Tower> towers;
     private final List<Bullet> bullets;
+    private final List<Effect> effects;
     private final List<Point> pathPoints;
     private final Rectangle startWaveButtonRect;
+    private final Rectangle pauseButtonRect;
+    private final Rectangle restartButtonRect;
 
     private final Random random;
+    private final SaveManager saveManager;
+    private final SoundManager soundManager;
     private Timer gameTimer;
     private GamePanel gamePanel;
 
@@ -36,26 +41,40 @@ public class GameManager {
     private int currentWave;
     private boolean waveRunning;
     private int enemiesToSpawn;
+    private int totalEnemiesInWave;
     private long lastSpawnTimeMs;
     private long spawnIntervalMs;
     private Tower selectedTower;
+    private boolean paused;
+    private boolean gameOverSoundPlayed;
+    private int bossesToSpawn;
 
     public GameManager() {
         this.enemies = new ArrayList<>();
         this.towers = new ArrayList<>();
         this.bullets = new ArrayList<>();
+        this.effects = new ArrayList<>();
         this.pathPoints = createPath();
         this.startWaveButtonRect = new Rectangle(740, 18, 130, 34);
+        this.pauseButtonRect = new Rectangle(570, 18, 72, 34);
+        this.restartButtonRect = new Rectangle(652, 18, 78, 34);
         this.random = new Random();
+        this.saveManager = new SaveManager();
+        this.soundManager = new SoundManager();
 
+        SaveManager.SaveData save = saveManager.load();
         this.playerHp = PLAYER_START_HP;
-        this.gold = PLAYER_START_GOLD;
-        this.currentWave = 0;
+        this.gold = Math.max(0, save.gold);
+        this.currentWave = Math.max(0, save.wave);
         this.waveRunning = false;
         this.enemiesToSpawn = 0;
+        this.totalEnemiesInWave = 0;
         this.lastSpawnTimeMs = 0;
         this.spawnIntervalMs = 900;
         this.selectedTower = null;
+        this.paused = false;
+        this.gameOverSoundPlayed = false;
+        this.bossesToSpawn = 0;
     }
 
     public void setGamePanel(GamePanel gamePanel) {
@@ -69,7 +88,19 @@ public class GameManager {
     }
 
     private void updateGame() {
+        if (paused) {
+            if (gamePanel != null) {
+                gamePanel.repaint();
+            }
+            return;
+        }
+
         if (playerHp <= 0) {
+            if (!gameOverSoundPlayed) {
+                soundManager.playGameOver();
+                gameOverSoundPlayed = true;
+                saveManager.save(gold, currentWave);
+            }
             return;
         }
 
@@ -78,6 +109,7 @@ public class GameManager {
         updateEnemies();
         updateTowers(now);
         updateBullets();
+        updateEffects();
         cleanupDeadEnemies();
         checkWaveFinished();
 
@@ -94,17 +126,22 @@ public class GameManager {
             return;
         }
 
-        enemies.add(createEnemyForWave(currentWave));
-        enemiesToSpawn--;
+        if (bossesToSpawn > 0) {
+            enemies.add(new BossEnemy(pathPoints, currentWave));
+            bossesToSpawn--;
+        } else {
+            enemies.add(createEnemyForWave(currentWave));
+            enemiesToSpawn--;
+        }
         lastSpawnTimeMs = now;
     }
 
     private Enemy createEnemyForWave(int wave) {
         int roll = random.nextInt(100);
-        if (wave >= 3 && roll < 20) {
+        if (wave >= 5 && roll < 24) {
             return new TankEnemy(pathPoints, wave);
         }
-        if (wave >= 2 && roll < 55) {
+        if (wave >= 2 && roll < 60) {
             return new FastEnemy(pathPoints, wave);
         }
         return new NormalEnemy(pathPoints, wave);
@@ -126,6 +163,7 @@ public class GameManager {
             Bullet bullet = tower.tryShoot(enemies, now);
             if (bullet != null) {
                 bullets.add(bullet);
+                soundManager.playShoot();
             }
         }
     }
@@ -136,6 +174,13 @@ public class GameManager {
         }
     }
 
+    private void updateEffects() {
+        for (Effect effect : effects) {
+            effect.update();
+        }
+        effects.removeIf(e -> !e.isAlive());
+    }
+
     private void cleanupDeadEnemies() {
         Iterator<Enemy> enemyIterator = enemies.iterator();
         while (enemyIterator.hasNext()) {
@@ -144,6 +189,8 @@ public class GameManager {
                 // Chỉ cộng gold khi chết do tower bắn, không phải khi tới đích.
                 if (!enemy.isEscaped()) {
                     gold += enemy.getRewardGold();
+                    effects.add(new Effect(enemy.getX(), enemy.getY(), 24, enemy.getSize(), enemy.getColor()));
+                    soundManager.playEnemyDeath();
                 }
                 enemyIterator.remove();
             }
@@ -155,6 +202,7 @@ public class GameManager {
     private void checkWaveFinished() {
         if (waveRunning && enemiesToSpawn == 0 && enemies.isEmpty()) {
             waveRunning = false;
+            saveManager.save(gold, currentWave);
         }
     }
 
@@ -172,14 +220,18 @@ public class GameManager {
     }
 
     public void startWave() {
-        if (waveRunning || playerHp <= 0) {
+        if (waveRunning || playerHp <= 0 || paused) {
             return;
         }
         currentWave++;
-        enemiesToSpawn = 6 + currentWave * 2;
-        spawnIntervalMs = Math.max(350, 900 - currentWave * 40L);
+        enemiesToSpawn = 6 + currentWave * 2 + currentWave / 2;
+        bossesToSpawn = (currentWave % 5 == 0) ? 1 : 0;
+        totalEnemiesInWave = enemiesToSpawn + bossesToSpawn;
+        // Wave càng cao spawn càng nhanh để tăng độ khó.
+        spawnIntervalMs = Math.max(260, 850 - currentWave * 35L);
         lastSpawnTimeMs = 0;
         waveRunning = true;
+        saveManager.save(gold, currentWave);
     }
 
     public void placeTower(int mouseX, int mouseY) {
@@ -194,8 +246,19 @@ public class GameManager {
     }
 
     public void handleLeftClick(int mouseX, int mouseY) {
+        if (pauseButtonRect.contains(mouseX, mouseY)) {
+            paused = !paused;
+            return;
+        }
+        if (restartButtonRect.contains(mouseX, mouseY)) {
+            restartGame();
+            return;
+        }
         if (startWaveButtonRect.contains(mouseX, mouseY)) {
             startWave();
+            return;
+        }
+        if (paused) {
             return;
         }
 
@@ -206,12 +269,44 @@ public class GameManager {
     }
 
     public void handleRightClick(int mouseX, int mouseY) {
+        if (paused) {
+            return;
+        }
         Tower tower = findTowerAt(mouseX, mouseY);
         if (tower != null && tower.canUpgrade() && gold >= tower.getUpgradeCost()) {
             gold -= tower.getUpgradeCost();
             tower.upgrade();
             selectedTower = tower;
         }
+    }
+
+    public void handleMiddleClick(int mouseX, int mouseY) {
+        if (paused) {
+            return;
+        }
+        Tower tower = findTowerAt(mouseX, mouseY);
+        if (tower != null) {
+            tower.cycleTargetingMode();
+            selectedTower = tower;
+        }
+    }
+
+    private void restartGame() {
+        enemies.clear();
+        towers.clear();
+        bullets.clear();
+        effects.clear();
+        selectedTower = null;
+        playerHp = PLAYER_START_HP;
+        gold = PLAYER_START_GOLD;
+        currentWave = 0;
+        waveRunning = false;
+        enemiesToSpawn = 0;
+        totalEnemiesInWave = 0;
+        bossesToSpawn = 0;
+        paused = false;
+        gameOverSoundPlayed = false;
+        saveManager.save(gold, currentWave);
     }
 
     private Tower findTowerAt(int mx, int my) {
@@ -274,6 +369,10 @@ public class GameManager {
         return bullets;
     }
 
+    public List<Effect> getEffects() {
+        return effects;
+    }
+
     public List<Point> getPathPoints() {
         return pathPoints;
     }
@@ -310,10 +409,34 @@ public class GameManager {
         return enemiesToSpawn;
     }
 
+    public int getEnemiesRemainingInWave() {
+        return enemies.size() + enemiesToSpawn + bossesToSpawn;
+    }
+
+    public int getTotalEnemiesInWave() {
+        return totalEnemiesInWave;
+    }
+
     public boolean canPlaceTowerAt(int x, int y) {
         if (y < TOP_UI_HEIGHT) {
             return false;
         }
         return !isOnPath(x, y) && !isTooCloseToOtherTower(x, y);
+    }
+
+    public Rectangle getPauseButtonRect() {
+        return pauseButtonRect;
+    }
+
+    public Rectangle getRestartButtonRect() {
+        return restartButtonRect;
+    }
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public SoundManager getSoundManager() {
+        return soundManager;
     }
 }

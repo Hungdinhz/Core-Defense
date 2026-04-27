@@ -13,6 +13,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.util.List;
+import java.util.Locale;
 
 import javax.swing.JPanel;
 
@@ -23,9 +24,15 @@ public class GamePanel extends JPanel {
     private final GameManager gameManager;
     private int mouseX;
     private int mouseY;
+    private long fpsTimerMs;
+    private int frameCounter;
+    private int currentFps;
 
     public GamePanel(GameManager gameManager) {
         this.gameManager = gameManager;
+        this.fpsTimerMs = System.currentTimeMillis();
+        this.frameCounter = 0;
+        this.currentFps = 0;
 
         setPreferredSize(new Dimension(GameManager.WIDTH, GameManager.HEIGHT));
         setBackground(new Color(205, 230, 200));
@@ -37,6 +44,8 @@ public class GamePanel extends JPanel {
                     gameManager.handleLeftClick(e.getX(), e.getY());
                 } else if (e.getButton() == MouseEvent.BUTTON3) {
                     gameManager.handleRightClick(e.getX(), e.getY());
+                } else if (e.getButton() == MouseEvent.BUTTON2) {
+                    gameManager.handleMiddleClick(e.getX(), e.getY());
                 }
                 repaint();
             }
@@ -63,6 +72,7 @@ public class GamePanel extends JPanel {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g.create();
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        updateFpsCounter();
 
         drawMapBackground(g2d);
         drawTopBar(g2d);
@@ -71,6 +81,7 @@ public class GamePanel extends JPanel {
         drawPlacementPreview(g2d);
         drawSelectedTowerCard(g2d);
         drawBottomHint(g2d);
+        drawPauseOverlay(g2d);
         drawGameOver(g2d);
 
         g2d.dispose();
@@ -86,12 +97,27 @@ public class GamePanel extends JPanel {
         g2d.drawString("Gold: " + gameManager.getGold(), 130, 28);
         g2d.drawString("Wave: " + gameManager.getCurrentWave(), 270, 28);
         g2d.drawString("Tower: " + gameManager.getTowerCost() + "g", 390, 28);
+        g2d.drawString("FPS: " + currentFps, 495, 28);
 
         String waveStatus = gameManager.isWaveRunning()
-                ? "Enemies: " + (gameManager.getEnemies().size() + gameManager.getEnemiesToSpawn())
+                ? "Enemies Left: " + gameManager.getEnemiesRemainingInWave()
                 : "Ready";
         g2d.setFont(new Font("SansSerif", Font.PLAIN, 14));
         g2d.drawString(waveStatus, 18, 52);
+
+        int total = Math.max(1, gameManager.getTotalEnemiesInWave());
+        if (gameManager.isWaveRunning()) {
+            int left = gameManager.getEnemiesRemainingInWave();
+            int done = total - left;
+            int barX = 150;
+            int barY = 43;
+            int barW = 250;
+            int barH = 10;
+            g2d.setColor(new Color(80, 84, 94));
+            g2d.fillRoundRect(barX, barY, barW, barH, 8, 8);
+            g2d.setColor(new Color(88, 194, 124));
+            g2d.fillRoundRect(barX, barY, (int) (barW * (done / (double) total)), barH, 8, 8);
+        }
 
         var rect = gameManager.getStartWaveButtonRect();
         g2d.setColor(gameManager.isWaveRunning() ? new Color(110, 113, 120) : new Color(52, 165, 96));
@@ -100,6 +126,18 @@ public class GamePanel extends JPanel {
         g2d.drawRoundRect(rect.x, rect.y, rect.width, rect.height, 10, 10);
         g2d.setColor(Color.WHITE);
         g2d.drawString(gameManager.isWaveRunning() ? "Wave Running" : "Start Wave", rect.x + 18, rect.y + 22);
+
+        var pauseRect = gameManager.getPauseButtonRect();
+        g2d.setColor(new Color(83, 126, 189));
+        g2d.fillRoundRect(pauseRect.x, pauseRect.y, pauseRect.width, pauseRect.height, 10, 10);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString(gameManager.isPaused() ? "Resume" : "Pause", pauseRect.x + 14, pauseRect.y + 22);
+
+        var restartRect = gameManager.getRestartButtonRect();
+        g2d.setColor(new Color(189, 84, 84));
+        g2d.fillRoundRect(restartRect.x, restartRect.y, restartRect.width, restartRect.height, 10, 10);
+        g2d.setColor(Color.WHITE);
+        g2d.drawString("Restart", restartRect.x + 12, restartRect.y + 22);
     }
 
     private void drawPath(Graphics2D g2d, List<Point> path) {
@@ -132,6 +170,10 @@ public class GamePanel extends JPanel {
             enemy.draw(g2d);
         }
 
+        for (Effect effect : gameManager.getEffects()) {
+            effect.draw(g2d);
+        }
+
         for (Bullet bullet : gameManager.getBullets()) {
             bullet.draw(g2d);
         }
@@ -156,7 +198,7 @@ public class GamePanel extends JPanel {
         }
 
         int cardW = 200;
-        int cardH = 120;
+        int cardH = 142;
         int cardX = getWidth() - cardW - 15;
         int cardY = GameManager.TOP_UI_HEIGHT + 12;
 
@@ -172,7 +214,8 @@ public class GamePanel extends JPanel {
         g2d.drawString("Level: " + selected.getLevel(), cardX + 14, cardY + 45);
         g2d.drawString("Damage: " + selected.getDamage(), cardX + 14, cardY + 64);
         g2d.drawString("Range: " + (int) selected.getRange(), cardX + 14, cardY + 83);
-        g2d.drawString(String.format("Fire Rate: %.2f/s", selected.getFireRatePerSecond()), cardX + 14, cardY + 102);
+        g2d.drawString(String.format(Locale.US, "Fire Rate: %.2f/s", selected.getFireRatePerSecond()), cardX + 14, cardY + 102);
+        g2d.drawString("Target: " + selected.getTargetingMode().getLabel(), cardX + 14, cardY + 121);
     }
 
     private void drawMapBackground(Graphics2D g2d) {
@@ -191,9 +234,30 @@ public class GamePanel extends JPanel {
 
     private void drawBottomHint(Graphics2D g2d) {
         g2d.setColor(new Color(20, 20, 20, 180));
-        g2d.fillRoundRect(10, getHeight() - 34, 470, 24, 8, 8);
+        g2d.fillRoundRect(10, getHeight() - 34, 690, 24, 8, 8);
         g2d.setColor(new Color(255, 255, 255));
-        g2d.drawString("Left click: place/select tower | Right click tower: upgrade", 18, getHeight() - 16);
+        g2d.drawString("Left: place/select | Right: upgrade | Middle click tower: change target mode", 18, getHeight() - 16);
+    }
+
+    private void drawPauseOverlay(Graphics2D g2d) {
+        if (!gameManager.isPaused()) {
+            return;
+        }
+        g2d.setColor(new Color(0, 0, 0, 110));
+        g2d.fillRect(0, 0, getWidth(), getHeight());
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(new Font("SansSerif", Font.BOLD, 36));
+        g2d.drawString("PAUSED", getWidth() / 2 - 70, getHeight() / 2);
+    }
+
+    private void updateFpsCounter() {
+        frameCounter++;
+        long now = System.currentTimeMillis();
+        if (now - fpsTimerMs >= 1000) {
+            currentFps = frameCounter;
+            frameCounter = 0;
+            fpsTimerMs = now;
+        }
     }
 
     private void drawGameOver(Graphics2D g2d) {
