@@ -13,6 +13,7 @@ public class SniperTower extends Tower {
         this.fireRatePerSecond = 0.65;
         this.outerColor = new Color(62, 131, 199);
         this.innerColor = new Color(34, 86, 136);
+        this.imageName = "tower_sniper";
     }
 
     @Override

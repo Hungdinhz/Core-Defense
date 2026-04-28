@@ -197,20 +197,34 @@ public class GamePanel extends JPanel {
     }
 
     private void drawPath(Graphics2D g2d, List<Point> path) {
-        g2d.setStroke(new BasicStroke(30, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g2d.setColor(new Color(160, 124, 91));
-        for (int i = 0; i < path.size() - 1; i++) {
-            Point a = path.get(i);
-            Point b = path.get(i + 1);
-            g2d.drawLine(a.x, a.y, b.x, b.y);
-        }
+        java.awt.image.BufferedImage pathImg = AssetManager.getInstance().getImage("bg_path");
+        if (pathImg != null) {
+            g2d.setPaint(new java.awt.TexturePaint(pathImg, new Rectangle(0, 0, 64, 64)));
+            g2d.setStroke(new BasicStroke(36, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            for (int i = 0; i < path.size() - 1; i++) {
+                Point a = path.get(i);
+                Point b = path.get(i + 1);
+                g2d.drawLine(a.x, a.y, b.x, b.y);
+            }
+            g2d.setColor(new Color(0, 0, 0, 80));
+            g2d.setStroke(new BasicStroke(40, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            // Just some border effect if needed, but texture is enough. We'll stick to texture.
+        } else {
+            g2d.setStroke(new BasicStroke(30, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2d.setColor(new Color(160, 124, 91));
+            for (int i = 0; i < path.size() - 1; i++) {
+                Point a = path.get(i);
+                Point b = path.get(i + 1);
+                g2d.drawLine(a.x, a.y, b.x, b.y);
+            }
 
-        g2d.setStroke(new BasicStroke(18, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g2d.setColor(new Color(191, 158, 120));
-        for (int i = 0; i < path.size() - 1; i++) {
-            Point a = path.get(i);
-            Point b = path.get(i + 1);
-            g2d.drawLine(a.x, a.y, b.x, b.y);
+            g2d.setStroke(new BasicStroke(18, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2d.setColor(new Color(191, 158, 120));
+            for (int i = 0; i < path.size() - 1; i++) {
+                Point a = path.get(i);
+                Point b = path.get(i + 1);
+                g2d.drawLine(a.x, a.y, b.x, b.y);
+            }
         }
         g2d.setStroke(new BasicStroke(1f));
     }
@@ -289,18 +303,24 @@ public class GamePanel extends JPanel {
     }
 
     private void drawMapBackground(Graphics2D g2d) {
-        Color top = gameManager.getMap().getBgTop();
-        Color bottom = gameManager.getMap().getBgBottom();
-        g2d.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
-        g2d.fillRect(0, GameManager.TOP_UI_HEIGHT, getWidth(), getHeight() - GameManager.TOP_UI_HEIGHT);
+        java.awt.image.BufferedImage bgImg = AssetManager.getInstance().getImage("bg_grass");
+        if (bgImg != null) {
+            g2d.setPaint(new java.awt.TexturePaint(bgImg, new Rectangle(0, GameManager.TOP_UI_HEIGHT, 128, 128)));
+            g2d.fillRect(0, GameManager.TOP_UI_HEIGHT, getWidth(), getHeight() - GameManager.TOP_UI_HEIGHT);
+        } else {
+            Color top = gameManager.getMap().getBgTop();
+            Color bottom = gameManager.getMap().getBgBottom();
+            g2d.setPaint(new GradientPaint(0, 0, top, 0, getHeight(), bottom));
+            g2d.fillRect(0, GameManager.TOP_UI_HEIGHT, getWidth(), getHeight() - GameManager.TOP_UI_HEIGHT);
 
-        // Vẽ lưới nhẹ để map có chiều sâu.
-        g2d.setColor(new Color(255, 255, 255, 35));
-        for (int x = 0; x < getWidth(); x += 40) {
-            g2d.drawLine(x, GameManager.TOP_UI_HEIGHT, x, getHeight());
-        }
-        for (int y = GameManager.TOP_UI_HEIGHT; y < getHeight(); y += 40) {
-            g2d.drawLine(0, y, getWidth(), y);
+            // Vẽ lưới nhẹ để map có chiều sâu.
+            g2d.setColor(new Color(255, 255, 255, 35));
+            for (int x = 0; x < getWidth(); x += 40) {
+                g2d.drawLine(x, GameManager.TOP_UI_HEIGHT, x, getHeight());
+            }
+            for (int y = GameManager.TOP_UI_HEIGHT; y < getHeight(); y += 40) {
+                g2d.drawLine(0, y, getWidth(), y);
+            }
         }
     }
 

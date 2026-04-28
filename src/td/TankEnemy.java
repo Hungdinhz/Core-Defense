@@ -9,6 +9,7 @@ import java.util.List;
  */
 public class TankEnemy extends Enemy {
     public TankEnemy(List<Point> path, int wave) {
-        super(path, 90 + wave * 10, 1.0, 18, 2, 28, new Color(130, 130, 130));
+        super(path, 350 + wave * 10, 0.7, 25, 2, 28, new Color(102, 102, 115));
+        this.imageName = "enemy_tank";
     }
 }

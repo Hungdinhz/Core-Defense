@@ -9,6 +9,7 @@ import java.util.List;
  */
 public class FastEnemy extends Enemy {
     public FastEnemy(List<Point> path, int wave) {
-        super(path, 25 + wave * 3, 2.6, 8, 1, 18, new Color(66, 135, 245));
+        super(path, 75 + wave * 3, 2.3, 10, 1, 20, new Color(196, 179, 84));
+        this.imageName = "enemy_fast";
     }
 }

@@ -23,6 +23,7 @@ public class Enemy {
     protected Color color;
     protected double visualHp;
     protected double pathProgress;
+    protected String imageName;
 
     public Enemy(List<Point> path, int hp, double speed, int rewardGold, int damageToPlayer, int size, Color color) {
         Point start = path.get(0);
@@ -74,19 +75,32 @@ public class Enemy {
     }
 
     public void draw(Graphics2D g2d) {
-        int drawX = (int) x - size / 2;
-        int drawY = (int) y - size / 2;
+        // Enlarge sprite slightly
+        int renderSize = size + 16; 
+        int drawX = (int) x - renderSize / 2;
+        int drawY = (int) y - renderSize / 2;
 
-        g2d.setColor(color);
-        g2d.fillOval(drawX, drawY, size, size);
-        g2d.setColor(new Color(30, 30, 30));
-        g2d.drawOval(drawX, drawY, size, size);
+        java.awt.Image img = null;
+        if (imageName != null) {
+            img = AssetManager.getInstance().getImage(imageName);
+        }
+
+        if (img != null) {
+            g2d.drawImage(img, drawX, drawY, renderSize, renderSize, null);
+        } else {
+            drawX = (int) x - size / 2;
+            drawY = (int) y - size / 2;
+            g2d.setColor(color);
+            g2d.fillOval(drawX, drawY, size, size);
+            g2d.setColor(new Color(30, 30, 30));
+            g2d.drawOval(drawX, drawY, size, size);
+        }
 
         // Vẽ thanh máu đơn giản phía trên enemy.
-        int barWidth = size;
+        int barWidth = size + 4;
         int barHeight = 5;
-        int barX = drawX;
-        int barY = drawY - 8;
+        int barX = (int) x - barWidth / 2;
+        int barY = (int) y - renderSize / 2 - 8;
 
         g2d.setColor(Color.DARK_GRAY);
         g2d.fillRect(barX, barY, barWidth, barHeight);

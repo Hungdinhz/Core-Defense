@@ -58,11 +58,30 @@ public class Bullet {
         int drawX = (int) x - size / 2;
         int drawY = (int) y - size / 2;
 
-        // Glow nhẹ cho viên đạn để trông nổi bật hơn.
-        g2d.setColor(new Color(255, 200, 0, 90));
-        g2d.fillOval(drawX - 3, drawY - 3, size + 6, size + 6);
-        g2d.setColor(new Color(255, 230, 90));
-        g2d.fillOval(drawX, drawY, size, size);
+        java.awt.Image img = AssetManager.getInstance().getImage("bullet");
+        if (img != null) {
+            // Rotate bullet image towards target
+            double angle = 0;
+            if (target != null) {
+                double dx = target.getX() - x;
+                double dy = target.getY() - y;
+                angle = Math.atan2(dy, dx);
+            }
+            
+            // Bullet size mapping
+            int renderSize = size * 3;
+            java.awt.geom.AffineTransform old = g2d.getTransform();
+            g2d.translate(x, y);
+            g2d.rotate(angle);
+            g2d.drawImage(img, -renderSize/2, -renderSize/2, renderSize, renderSize, null);
+            g2d.setTransform(old);
+        } else {
+            // Glow nhẹ cho viên đạn để trông nổi bật hơn.
+            g2d.setColor(new Color(255, 200, 0, 90));
+            g2d.fillOval(drawX - 3, drawY - 3, size + 6, size + 6);
+            g2d.setColor(new Color(255, 230, 90));
+            g2d.fillOval(drawX, drawY, size, size);
+        }
     }
 
     public boolean isActive() {

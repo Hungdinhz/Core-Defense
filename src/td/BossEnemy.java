@@ -9,6 +9,7 @@ import java.util.List;
  */
 public class BossEnemy extends Enemy {
     public BossEnemy(List<Point> path, int wave) {
-        super(path, 420 + wave * 40, 0.8, 60, 5, 38, new Color(116, 72, 184));
+        super(path, 1200 + wave * 40, 0.55, 100, 10, 42, new Color(133, 40, 161));
+        this.imageName = "enemy_boss";
     }
 }

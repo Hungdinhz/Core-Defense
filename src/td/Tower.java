@@ -25,6 +25,7 @@ public abstract class Tower {
 
     protected Color outerColor;
     protected Color innerColor;
+    protected String imageName;
 
     protected Tower(int x, int y) {
         this.x = x;
@@ -116,19 +117,28 @@ public abstract class Tower {
     }
 
     public void draw(Graphics2D g2d, boolean selected) {
-        int size = 30;
+        int size = 38; // Increased size slightly to make the sprite clearer
         int drawX = x - size / 2;
         int drawY = y - size / 2;
 
-        // Thân tower dạng tròn để nhìn mềm mại hơn.
-        g2d.setColor(outerColor != null ? outerColor : new Color(49, 143, 67));
-        g2d.fillOval(drawX, drawY, size, size);
+        java.awt.Image img = null;
+        if (imageName != null) {
+            img = AssetManager.getInstance().getImage(imageName);
+        }
 
-        g2d.setColor(innerColor != null ? innerColor : new Color(35, 103, 48));
-        g2d.fillOval(drawX + 5, drawY + 5, size - 10, size - 10);
+        if (img != null) {
+            g2d.drawImage(img, drawX, drawY, size, size, null);
+        } else {
+            // Fallback
+            g2d.setColor(outerColor != null ? outerColor : new Color(49, 143, 67));
+            g2d.fillOval(drawX, drawY, size, size);
+            g2d.setColor(innerColor != null ? innerColor : new Color(35, 103, 48));
+            g2d.fillOval(drawX + 5, drawY + 5, size - 10, size - 10);
+            g2d.setColor(Color.BLACK);
+            g2d.drawOval(drawX, drawY, size, size);
+        }
 
-        g2d.setColor(Color.BLACK);
-        g2d.drawOval(drawX, drawY, size, size);
+        g2d.setColor(Color.WHITE);
         g2d.drawString("L" + level, x - 8, y + 5);
 
         if (selected) {

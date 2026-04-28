@@ -13,6 +13,7 @@ public class BasicTower extends Tower {
         this.fireRatePerSecond = 1.3;
         this.outerColor = new Color(49, 143, 67);
         this.innerColor = new Color(35, 103, 48);
+        this.imageName = "tower_basic";
     }
 
     @Override

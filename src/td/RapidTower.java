@@ -13,6 +13,7 @@ public class RapidTower extends Tower {
         this.fireRatePerSecond = 3.2;
         this.outerColor = new Color(219, 166, 62);
         this.innerColor = new Color(153, 110, 35);
+        this.imageName = "tower_rapid";
     }
 
     @Override
